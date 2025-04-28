@@ -23,7 +23,7 @@ HTTP_PORT=8001
 echo "ステップ 1: Conda環境のアクティベート (arxiv-reco)..."
 # 事前に `conda init bash` (または `conda init zsh`) が実行されている必要があります
 source $(conda info --base)/etc/profile.d/conda.sh # condaコマンドをシェルスクリプト内で使えるようにする
-conda activate arxiv-reco
+conda activate arxiv-reco-v1
 echo "Conda環境 OK."
 
 echo "ステップ 2: APIキーの確認..."
@@ -36,7 +36,7 @@ fi
 echo "APIキー OK."
 
 echo "ステップ 3: 今日のarXiv論文の推薦リストとHTMLを生成 (クラスターモード)..."
-python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --date 2025-04-24 --cluster
+python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --date 2025-04-25 --cluster
 # python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --mode gemini --date today --cluster
 echo "HTML生成完了。"
 

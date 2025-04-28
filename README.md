@@ -4,6 +4,64 @@ Personalized arXiv recommendation tool based on your BibTeX library, powered by 
 
 This command-line tool generates recommendations for new arXiv papers based on the abstracts and titles in your existing BibTeX library. It leverages the Google Gemini API for high-quality text embeddings and optional re-ranking and cluster labeling.
 
+## Quick Start
+
+1.  **Set up the environment:**
+    ```bash
+    ./setup_arxiv_reco_env.sh
+    ```
+
+2.  **Configure `run_all.sh`:**
+    - Open the `run_all.sh` file.
+    - Update the `BIB_FILE` variable with the path to your BibTeX file.
+    - Update the `GAI_API_KEY` variable with your actual Google AI API key.
+      *Note: For better security, consider setting the API key as an environment variable instead of hardcoding it.*
+
+3.  **Run the application:**
+    ```bash
+    ./run_all.sh
+    ```
+    This script will:
+    - Activate the conda environment.
+    - Generate recommendations and the HTML output.
+    - Start a proxy server and an HTTP server in the background.
+
+4.  **Access the results:**
+    - Open your web browser and navigate to: `http://localhost:8001`
+
+To stop the servers, use the `kill` commands displayed in the terminal when `run_all.sh` finishes.
+
+---
+
+## クイックスタート (日本語)
+
+1.  **環境設定:**
+    ```bash
+    ./setup_arxiv_reco_env.sh
+    ```
+
+2.  **`run_all.sh` の設定:**
+    - `run_all.sh` ファイルを開きます。
+    - `BIB_FILE` 変数をあなたの BibTeX ファイルのパスに更新します。
+    - `GAI_API_KEY` 変数をあなたの実際の Google AI API キーに更新します。
+      *注意: セキュリティのため、API キーを直接書き込む代わりに環境変数として設定することを推奨します。*
+
+3.  **アプリケーションの実行:**
+    ```bash
+    ./run_all.sh
+    ```
+    このスクリプトは以下を実行します:
+    - conda 環境を有効化します。
+    - 推薦リストと HTML 出力を生成します。
+    - プロキシサーバーと HTTP サーバーをバックグラウンドで起動します。
+
+4.  **結果の確認:**
+    - Web ブラウザを開き、`http://localhost:8001` にアクセスします。
+
+サーバーを停止するには、`run_all.sh` 完了時にターミナルに表示される `kill` コマンドを使用してください。
+
+---
+
 ## Features
 
 -   Generates recommendations using Google Gemini embeddings (`text-embedding-004` or similar).

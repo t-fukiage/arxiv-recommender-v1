@@ -2,7 +2,7 @@
 
 # Core dependencies
 arxiv
-bibtexparser
+bibtexparser==2.0.0b8
 PyYAML
 numpy
 tqdm
@@ -14,7 +14,7 @@ tqdm
 # Clustering
 # scikit-learn # Removed as KMeans is no longer used and HDBSCAN handles its own deps
 hdbscan
-
+umap-learn
 # Gemini API
 google-generativeai
 
