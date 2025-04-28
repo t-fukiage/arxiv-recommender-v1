@@ -1,0 +1,6 @@
+*.pyc
+*.npz
+.DS_Store
+.log
+cache/
+output/

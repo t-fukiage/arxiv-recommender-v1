@@ -1,0 +1,39 @@
+# requirements.txt
+
+# Core dependencies
+arxiv
+bibtexparser
+PyYAML
+numpy
+tqdm
+
+# ANN Indexing
+# faiss-cpu should be installed via Conda as recommended in README.md / specs.md
+# Example: conda install -c conda-forge faiss-cpu
+
+# Clustering
+# scikit-learn # Removed as KMeans is no longer used and HDBSCAN handles its own deps
+hdbscan
+
+# Gemini API
+google-generativeai
+
+# Web Server (for explanation proxy)
+flask
+requests
+flask-cors
+# python-dotenv # Removed as unused
+
+# Testing
+pytest
+
+# HTML Output Enhancement
+# Markdown # Removed as unused (Marked.js used in HTML, not this Python pkg)
+
+# Removed local mode dependencies:
+# sentence-transformers>=2.7
+# torch
+
+# Other dependencies
+# umap-learn # Removed as unused (HDBSCAN used directly)
+# feedparser>=6.0 # Removed as unused

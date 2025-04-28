@@ -1,0 +1,71 @@
+# config_high_quality_gemini.yaml
+# embedding_provider is always gemini now
+cache_dir: cache            # Query Embedding, Clustering, Explanation cache directory (Added explanation here)
+
+gemini:
+  model_name: models/text-embedding-004
+  batch_size: 10
+  # API key read from environment variable GEMINI_API_KEY
+
+index:
+  factory: HNSW32
+  nprobe: 32
+
+rerank:
+  enable: false
+  oversample: 4
+  gemini_model: gemini-2.0-flash-lite
+  use_local_fallback: false
+
+cluster:
+  algorithm: hdbscan
+  min_cluster_size: 40
+  label_model: gemini-2.0-flash-lite
+
+output:
+  top_k: 100
+  dir: output
+
+# --- Paper Explanation Settings ---
+explanation:
+  enable: true              # Enable the explanation feature in HTML output
+  model_name: gemini-2.0-flash-lite # LLM for generating explanations (Fallback if Files API fails)
+  target_language: Japanese # Target language for explanations (e.g., "English", "Japanese")
+  cache_dir: explanation_cache # Subdirectory within the main cache_dir for explanations
+  precompute: false         # Generate explanations during the main run (requires API calls)
+  use_files_api: true       # NEW: Use Files API for PDF processing (preferred)
+  files_api_model: gemini-2.0-flash-lite # Model for Files API (can handle large context)
+  files_api_prompt_template: |
+    この PDF 論文を{target_language}で 400 字程度で要約してください。
+    以下のセクションを含めてください:
+    *   この研究がどのような問題を解決したのか (120字程度)
+    *   手法概要 (120字程度)
+    *   主要な結果 (可能なら数値を含む)
+    *   限界と今後の課題
+    *   新規性・貢献 (箇条書き5点以内)
+    *   重要性 (2文程度)
+    *   キーワード (英語で５つ程度)
+    マークダウン形式で記述してください。
+  files_api_generation_config:
+    temperature: 0.25
+    top_p: 0.9
+    max_output_tokens: 1024
+  # Simple prompt template (can be customized) - Fallback if Files API fails or disabled
+  prompt_template: |
+    以下の論文について、主要な貢献と新規性を中心に{target_language}で簡潔に解説してください。
+    Title: {title}
+    Abstract: {abstract}
+
+# --- Fetch settings ---
+fetch:
+  # Limit arXiv fetching to specific categories (empty list = all CS default in ingest.py)
+  arxiv_categories:
+    - cs.AI
+    - cs.LG
+    - cs.CV
+    - cs.CL
+    - cs.GR
+    - cs.HC
+    - stat.ML
+    - q-bio.NC
+    - q-bio.QM
