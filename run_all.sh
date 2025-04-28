@@ -36,7 +36,7 @@ fi
 echo "APIキー OK."
 
 echo "ステップ 3: 今日のarXiv論文の推薦リストとHTMLを生成 (クラスターモード)..."
-python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --date 2025-04-25 --cluster
+python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --date today --cluster
 # python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --mode gemini --date today --cluster
 echo "HTML生成完了。"
 

@@ -234,16 +234,6 @@ pip install -r requirements.txt
 # pip install hdbscan
 
 # 4. 動作確認
-export GEMINI_API_KEY='YOUR_API_KEY' # Gemini API キーを設定
+export GAI_API_KEY='YOUR_API_KEY' # Gemini API キーを設定
 python src/arxiv_recommender/core/main.py --bib path/to/your.bib --date today --debug
 ```
-
-## 8. 拡張アイデア
-
--   Faiss PQ (Product Quantization) の明示的なサポートとパラメータ調整。
--   `usearch` や他の ANN ライブラリのサポート。
--   ベクトル DB (Chroma, LanceDB) 連携オプション。
--   HTML 出力の改善、静的サイトホスティング連携。
--   通知機能 (Slack, Email)。
--   他のクラスタリングアルゴリズム (KMeansなど) のサポートと `--n_clusters` 引数の活用。
-
