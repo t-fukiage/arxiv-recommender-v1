@@ -38,6 +38,7 @@ BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文
 -   オプションで Gemini 生成モデルを使用して初期候補を再ランク付けし、関連性を向上させます。（**注意:** この機能は現在テスト段階であり、デフォルトでは無効 (`config.yaml` の `rerank.enable: false`) にしておくことを推奨します。）
 -   オプションで HDBSCAN を使用して BibTeX ライブラリをクラスタリングし、トピック固有の推薦を提供します。
 -   その際、Gemini 生成モデルを使用してクラスタに人間が読めるラベルを生成します。
+    -   クラスタ数が多い場合、free tierのGemini APIのrate limit（RPM）を一時的に超過し、一部のクラスタでラベル付けができず`nan`になることがありますが、再度スクリプトを実行すると自動的に残りのラベル付けが行われるため、心配は不要です。
 -   オプションで、推薦された論文の要約（Explanation）を Gemini を使って生成し、HTML 出力上でインタラクティブに表示します。
 -   BibTeX 埋め込みとクラスタ結果をキャッシュし、次回以降の実行を高速化します。
 -   推薦結果を JSON とユーザーフレンドリーな HTML 形式の両方で出力します。
@@ -227,6 +228,7 @@ To stop the servers, use the `kill` commands displayed in the terminal when `run
 -   Optionally re-ranks initial candidates using a Gemini generative model for improved relevance. (**Note:** This feature is experimental and currently recommended to be kept disabled (`rerank.enable: false` in `config.yaml`).)
 -   Optionally clusters your BibTeX library using HDBSCAN to provide topic-specific recommendations.
 -   When clustering, optionally generates human-readable labels for clusters using a Gemini generative model.
+-   -   If there are many clusters, you may temporarily exceed the free tier Gemini API rate limit (RPM), causing some clusters to be labeled as `nan`. However, if you rerun the script, the remaining clusters will be automatically labeled, so there is no need to worry.
 -   Optionally generates summaries (explanations) for recommended papers using Gemini and displays them interactively in the HTML output.
 -   Caches BibTeX embeddings and cluster results for faster subsequent runs.
 -   Outputs recommendations in both JSON and user-friendly HTML formats.

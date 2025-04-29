@@ -23,7 +23,7 @@ cluster:
   label_model: gemini-2.0-flash-lite
 
 output:
-  top_k: 100
+  top_k: 200
   dir: output
 
 # --- Paper Explanation Settings ---
