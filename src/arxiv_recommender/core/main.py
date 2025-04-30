@@ -29,8 +29,25 @@ import hashlib
 from tqdm import tqdm
 
 
+def create_paper_text(paper: dict) -> str:
+    """Creates a combined text representation (title, abstract, authors) for a paper dict."""
+    title = paper.get("title", "")
+    abstract = paper.get("abstract", "")
+    # Ensure authors are handled correctly (list of strings)
+    authors_list = paper.get("authors", [])
+    authors = ", ".join(authors_list) if isinstance(authors_list, list) else ""
+
+    text_parts = [title, abstract]
+    if authors:
+        text_parts.append(f"Authors: {authors}")
+    # Join non-empty parts
+    return "\n".join(filter(None, text_parts)).strip()
+
+
 def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_embeddings: bool = False, cluster: bool = False, n_clusters: int = 3, debug: bool = False):
-    setup_logger()
+    # setup_logger()
+    # Explicitly set log level to DEBUG
+    setup_logger(level=logging.DEBUG)
     logging.info("Loading BibTeX…")
     my_papers = load_bibtex(bib_path)
 
@@ -40,7 +57,17 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
         if len(my_papers) > debug_sample_size:
              my_papers = my_papers[:debug_sample_size]
 
-    query_texts = [p["abstract"] or p["title"] for p in my_papers]
+    query_texts = []
+    for p in my_papers:
+        query_text = create_paper_text(p)
+        if not query_text:
+             logging.warning(f"Skipping BibTeX entry {p.get('id', 'N/A')} due to missing title, abstract, and authors.")
+             continue
+        query_texts.append(query_text)
+
+    if not query_texts:
+        logging.error("No valid query texts could be generated from the BibTeX file. Aborting.")
+        return
 
     logging.info("Loading arXiv feed…")
     # Get categories from config, fallback to empty list (-> uses default CS_CATS in fetch_arxiv)
@@ -62,7 +89,19 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
     if not arxiv_papers:
         logging.error(f"No arXiv papers fetched for date {date}; aborting.")
         return
-    corpus_texts = [p["abstract"] or p["title"] for p in arxiv_papers]
+
+    # Create corpus texts including authors
+    corpus_texts = []
+    for p in arxiv_papers:
+        corpus_text = create_paper_text(p)
+        if not corpus_text:
+             logging.warning(f"Skipping arXiv entry {p.get('id', 'N/A')} due to missing title, abstract, and authors.")
+             continue # Should ideally not happen with arXiv papers but good practice
+        corpus_texts.append(corpus_text)
+
+    if not corpus_texts:
+        logging.error("No valid corpus texts could be generated from the fetched arXiv papers. Aborting.")
+        return
 
     # Always use Gemini provider
     provider = cfg.get("gemini", {})
@@ -84,8 +123,8 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
     cache_dir.mkdir(exist_ok=True)
     # Include model name in cache file, replacing potentially problematic chars
     model_cache_key = provider.get("model_name", "unknown-model").replace("/", "-").replace(":", "-")
-    # Remove mode from cache file name
-    cache_file = cache_dir / f"{bib_path.stem}_{model_cache_key}_query_vectors.npz"
+    # Add '_with_authors' suffix to distinguish cache files
+    cache_file = cache_dir / f"{bib_path.stem}_{model_cache_key}_with_authors_query_vectors.npz"
 
     # --- Add Debug Logging for Cache ---
     logging.debug(f"Checking cache for query embeddings:")
@@ -95,12 +134,11 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
     # --- End Debug Logging ---
 
     if refresh_embeddings or not cache_file.exists():
-        logging.info(f"Embedding query texts with Gemini and saving cache to {cache_file}")
-        # Always pass clustering task type
-        query_vecs = embed_fn(query_texts, task="clustering")
+        logging.info(f"Embedding query texts (with authors) using Gemini and saving cache to {cache_file}")
+        query_vecs = embed_fn(query_texts, task="retrieval_query") # Use retrieval_query for user profile
         np.savez(cache_file, query_vecs=query_vecs)
     else:
-        logging.info(f"Loading cached query embeddings from {cache_file}")
+        logging.info(f"Loading cached query embeddings (with authors) from {cache_file}")
         data = np.load(cache_file)
         query_vecs = data["query_vecs"]
 
@@ -110,9 +148,8 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
         return
 
     # Embed corpus texts every run
-    logging.info("Embedding corpus texts…")
-    # Always pass clustering task type
-    corpus_vecs = embed_fn(corpus_texts, task="clustering")
+    logging.info("Embedding corpus texts (with authors)…")
+    corpus_vecs = embed_fn(corpus_texts, task="retrieval_document") # Use retrieval_document for candidates
 
     dim = query_vecs.shape[1]
     ann = ANNIndex(dim, cfg["index"]["factory"], cfg["index"].get("nprobe", 16))
@@ -130,7 +167,7 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
 
         # --- Clustering Cache Logic --- 
         clustering_method_name = "hdbscan" # Hardcoded for now, could be from config
-        cluster_cache_file = cache_dir / f"{cache_file.stem}_{clustering_method_name}_clusters.npz"
+        cluster_cache_file = cache_dir / f"{cache_file.stem.replace('_query_vectors','')}_{clustering_method_name}_clusters.npz"
 
         if not refresh_embeddings and cluster_cache_file.exists():
             logging.info(f"Loading cached clustering results from {cluster_cache_file}")
@@ -141,7 +178,7 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
                 int(cid): vec for cid, vec in zip(cluster_data["centroid_ids"], cluster_data["centroid_vectors"])
             }
         else:
-            logging.info(f"Running automatic clustering ({clustering_method_name})...")
+            logging.info(f"Running automatic clustering ({clustering_method_name}) on BibTeX embeddings (with authors)...")
             # TODO: Pass clustering params from config if needed
             cluster_labels, centroids_dict = cluster_embeddings(query_vecs)
             
@@ -163,18 +200,19 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
              return # Exit if no clusters found
 
         # --- Get Cluster Labels (using cache) ---
-        samples = sample_texts_per_cluster(cluster_labels, [p["title"] + "\n" + p.get("abstract", "") for p in my_papers])
+        samples = sample_texts_per_cluster(cluster_labels, [create_paper_text(p) for p in my_papers])
         # Human-readable labels via Gemini (skip if local mode to save API) – still allow
         try:
             # Pass the configured label model name from the cluster section
             label_model_name = cfg.get("cluster", {}).get("label_model", "gemini-1.5-pro-latest") # Fallback just in case
             # Use the label cache regardless of embedding/cluster cache
+            label_cache_file = cache_dir / f"{bib_path.stem}_{clustering_method_name}_with_authors_labels.json"
             cluster_id_to_label = label_clusters_gemini(
                  samples, 
                  provider.get("api_key"), 
                  model_name=label_model_name,
                  # Consider making label cache name dependent on bib/model?
-                 cache_file=cache_dir / f"{bib_path.stem}_{clustering_method_name}_labels.json" 
+                 cache_file=label_cache_file 
             )
         except Exception as e:
             logging.warning(f"Cluster labeling failed: {e}; using numeric ids.")
@@ -190,8 +228,9 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
             # Create a temporary Faiss index for centroids
             centroid_vectors_list = list(centroids_dict.values())
             centroid_ids_list = list(centroids_dict.keys())
-            centroid_index = ANNIndex(dim=dim, factory="FlatL2") # Use exact search for assignment
-            centroid_index.add(np.array(centroid_vectors_list, dtype=np.float32), 
+            # Use explicit "IDMap,FlatL2" factory string to avoid warning
+            centroid_index = ANNIndex(dim=dim, factory="IDMap,FlatL2")
+            centroid_index.add(np.array(centroid_vectors_list, dtype=np.float32),
                                ids=np.array(centroid_ids_list, dtype=np.int64))
 
             # Search for the nearest centroid for each arXiv paper
@@ -208,7 +247,7 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
             # --- Rank and Rerank within each cluster ---
             cluster_results = {}
             # Get user descriptions prepared earlier
-            cluster_user_descs_dict = {cid: "\n".join(samples.get(cid, [])) for cid in centroids_dict.keys()}
+            cluster_user_descs_dict = {cid: "\n---\n".join(samples.get(cid, [])) for cid in centroids_dict.keys()}
 
             for cid, assigned_papers in papers_per_cluster.items():
                 if not assigned_papers:
@@ -219,20 +258,29 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
                 sorted_papers = sorted(assigned_papers, key=lambda x: x[1])
                 
                 # Get top K candidates based on distance
-                initial_candidates_indices = [idx for idx, dist in sorted_papers[:topk]]
-                initial_candidates = [arxiv_papers[i] for i in initial_candidates_indices]
+                initial_candidates_indices = [idx for idx, dist in sorted_papers[:topk * oversample]]
+                # Ensure indices are valid before accessing arxiv_papers and corpus_texts
+                valid_indices = [i for i in initial_candidates_indices if i < len(arxiv_papers) and i < len(corpus_texts)]
+                initial_candidates = [arxiv_papers[i] for i in valid_indices]
+                candidate_texts = [corpus_texts[i] for i in valid_indices] # Get corresponding texts
 
                 if cfg["rerank"]["enable"]:
                     logging.info(f"Reranking top {len(initial_candidates)} candidates for cluster {cid}...")
                     user_desc = cluster_user_descs_dict.get(cid, "")
-                    pairs = [(user_desc, "\n".join([c["title"], c.get("abstract", "")])) for c in initial_candidates]
-                    # Always use Gemini rerank
-                    scores = rerank_gemini(pairs, provider.get("api_key"), cfg["rerank"].get("gemini_model", "gemini-1.5-pro-latest"))
-                    ranked = sorted(zip(initial_candidates, scores), key=lambda x: x[1], reverse=True)
+                    pairs = [(user_desc, cand_text) for cand_text in candidate_texts]
+                    if not pairs:
+                         logging.warning(f"No valid pairs generated for reranking in cluster {cid}. Skipping reranking.")
+                         # Fallback to distance-based ranking if reranking fails
+                         scored = [(arxiv_papers[idx], float(-dist)) for idx, dist in sorted_papers[:topk] if idx < len(arxiv_papers)]
+                         ranked = scored
+                    else:
+                         scores = rerank_gemini(pairs, provider.get("api_key"), cfg["rerank"].get("gemini_model", "gemini-1.5-pro-latest"))
+                         # Need to align scores back to original candidates
+                         ranked = sorted(zip(initial_candidates, scores), key=lambda x: x[1], reverse=True)[:topk]
                 else:
                     # Use distance-based ranking if rerank is disabled
                     # Score is negative distance (higher is better)
-                    scored = [(arxiv_papers[idx], float(-dist)) for idx, dist in sorted_papers[:topk]]
+                    scored = [(arxiv_papers[idx], float(-dist)) for idx, dist in sorted_papers[:topk] if idx < len(arxiv_papers)]
                     ranked = scored # Already sorted by distance implicitly if ANN Index returns sorted
 
                 cluster_results[cid] = ranked
@@ -241,7 +289,7 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
         # --- Original Non-clustering Path --- 
         logging.info("Running non-clustered recommendation...")
         centroid_vec = query_vecs.mean(axis=0, keepdims=True)
-        user_desc = "\n".join([f"{entry['title']}\n{entry.get('abstract','')}" for entry in my_papers])
+        user_desc = "\n---\n".join(query_texts) # Use the already generated query texts
         distances, idxs = ann.search(centroid_vec, k=topk * oversample)
         # Ensure idxs is not empty and has the expected structure
         if idxs.size == 0:
@@ -254,7 +302,7 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
             candidates = [arxiv_papers[i] for i in candidate_indices]
 
         if cfg["rerank"]["enable"]:
-            pairs = [(user_desc, "\n".join([c["title"], c.get("abstract", "")])) for c in candidates]
+            pairs = [(user_desc, cand_text) for cand_text in corpus_texts[:len(candidates)]]
             # Always use Gemini rerank
             scores = rerank_gemini(pairs, provider.get("api_key"), cfg["rerank"].get("gemini_model", "gemini-1.5-pro-latest"))
             # Rerank only provides scores, limit to topk after sorting
@@ -276,7 +324,11 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
         logging.info("Precomputing explanations for recommended papers...")
         for cid, ranked_list in tqdm(cluster_results.items()):
             for paper, _ in ranked_list:
-                get_explanation(paper['id'], cfg)
+                # Check if paper is valid dict with 'id'
+                if isinstance(paper, dict) and 'id' in paper:
+                     get_explanation(paper['id'], cfg)
+                else:
+                     logging.warning(f"Skipping precomputation for invalid paper data: {paper}")
 
     out_cfg = cfg.get("output", {})
     out_dir = pathlib.Path(out_cfg.get("dir", "output"))

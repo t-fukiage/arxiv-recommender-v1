@@ -96,6 +96,48 @@ def load_bibtex(path: pathlib.Path) -> List[Dict[str, Any]]:
 
                 logging.debug(f"Processing {entry_id_for_log}: Cleaned Title = '{title}'")
 
+                # Extract and format authors
+                authors_list = []
+                try:
+                    # Check if persons attribute exists (bibtexparser v2 standard)
+                    if hasattr(entry, 'persons') and 'author' in entry.persons:
+                        for person in entry.persons['author']:
+                            # Construct full name from parts
+                            first = " ".join(person.first)
+                            von = " ".join(person.von)
+                            last = " ".join(person.last)
+                            jr = " ".join(person.jr)
+                            # Basic name formatting, adjust as needed
+                            name_parts = [part for part in [first, von, last, jr] if part]
+                            authors_list.append(" ".join(name_parts))
+                        if authors_list:
+                             logging.debug(f"Successfully parsed authors using 'persons' for entry {entry_id_for_log}")
+
+
+                    # If persons parsing didn't work or 'persons' doesn't exist, try fallback
+                    if not authors_list:
+                        logging.debug(f"Attempting fallback author parsing for entry {entry_id_for_log}")
+                        author_field = entry.fields_dict.get('author')
+                        if author_field and author_field.value:
+                            # Simple split by ' and ' as fallback
+                            raw_authors = author_field.value
+                            # Basic cleaning: remove potential excessive whitespace/newlines
+                            raw_authors = re.sub(r'\s+', ' ', raw_authors).strip()
+                            authors_list = [name.strip() for name in raw_authors.split(' and ')]
+                            if authors_list:
+                                logging.debug(f"Used fallback author parsing for entry {entry_id_for_log}, found: {authors_list}")
+                            else:
+                                 logging.warning(f"Fallback author parsing failed for entry {entry_id_for_log}, raw value: '{raw_authors}'")
+
+                        else:
+                             logging.debug(f"No author information found for entry {entry_id_for_log} (checked persons and fields_dict['author'])")
+
+
+                except Exception as author_e:
+                    # Catch other potential errors during name formatting etc.
+                    logging.warning(f"Error processing authors for entry {entry_id_for_log}: {author_e}", exc_info=True)
+                    authors_list = [] # Ensure it's an empty list on error
+
                 # Skip if title is empty
                 if not title:
                     logging.warning(f"Skipping entry {entry_id_for_log}: empty title after cleaning.")
@@ -107,6 +149,7 @@ def load_bibtex(path: pathlib.Path) -> List[Dict[str, Any]]:
                     "title": title,
                     "abstract": abstract,
                     "id": entry_id_for_log,
+                    "authors": authors_list, # Add formatted authors
                     "arxiv_id": entry['eprint'] if 'eprint' in entry.fields_dict else None,
                     "doi": entry['doi'] if 'doi' in entry.fields_dict else None,
                     "url": entry['url'] if 'url' in entry.fields_dict else None,

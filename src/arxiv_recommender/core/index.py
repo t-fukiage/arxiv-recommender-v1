@@ -56,9 +56,18 @@ class ANNIndex:
                 self.index = faiss.IndexIDMap(self.index) # Add ID mapping
                 self.index.nprobe = nprobe
                 self.is_trained = False # IVF needs training
+
+            # ADD THIS ELIF for explicit FlatL2 handling without warning
+            elif factory == "FlatL2" or factory == "IDMap,FlatL2":
+                 logging.info(f"Initializing index: {factory}")
+                 base_index = faiss.IndexFlatL2(dim)
+                 # Always wrap FlatL2 with IDMap for consistency and ID support
+                 self.index = faiss.IndexIDMap(base_index)
+                 self.is_trained = True # Flat index doesn't need training
+
             else:
-                 # Default to IndexFlatL2 if factory is simple or unrecognized pattern
-                 logging.warning(f"Unrecognized or simple factory '{factory}'. Defaulting to IndexFlatL2 + IDMap.")
+                 # Default to IndexFlatL2 + IDMap for other unrecognized patterns, issue warning
+                 logging.warning(f"Unrecognized or potentially complex factory string '{factory}'. Defaulting to IndexFlatL2 + IDMap.")
                  base_index = faiss.IndexFlatL2(dim)
                  self.index = faiss.IndexIDMap(base_index)
                  self.is_trained = True # Flat index doesn't need training

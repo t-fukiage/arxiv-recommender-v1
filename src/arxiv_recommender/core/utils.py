@@ -10,9 +10,9 @@ def load_config(path: pathlib.Path) -> dict:
         return yaml.safe_load(fp)
 
 
-def setup_logger():
+def setup_logger(level: str = os.environ.get("LOGLEVEL", "INFO")):
     logging.basicConfig(
         format="[%(levelname)s %(asctime)s] %(message)s",
-        level=os.environ.get("LOGLEVEL", "INFO"),
+        level=level,
         datefmt="%Y-%m-%d %H:%M:%S"
     ) 

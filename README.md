@@ -228,7 +228,7 @@ To stop the servers, use the `kill` commands displayed in the terminal when `run
 -   Optionally re-ranks initial candidates using a Gemini generative model for improved relevance. (**Note:** This feature is experimental and currently recommended to be kept disabled (`rerank.enable: false` in `config.yaml`).)
 -   Optionally clusters your BibTeX library using HDBSCAN to provide topic-specific recommendations.
 -   When clustering, optionally generates human-readable labels for clusters using a Gemini generative model.
--   -   If there are many clusters, you may temporarily exceed the free tier Gemini API rate limit (RPM), causing some clusters to be labeled as `nan`. However, if you rerun the script, the remaining clusters will be automatically labeled, so there is no need to worry.
+    -   If there are many clusters, you may temporarily exceed the free tier Gemini API rate limit (RPM), causing some clusters to be labeled as `nan`. However, if you rerun the script, the remaining clusters will be automatically labeled, so there is no need to worry.
 -   Optionally generates summaries (explanations) for recommended papers using Gemini and displays them interactively in the HTML output.
 -   Caches BibTeX embeddings and cluster results for faster subsequent runs.
 -   Outputs recommendations in both JSON and user-friendly HTML formats.
