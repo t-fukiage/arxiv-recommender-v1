@@ -1,4 +1,4 @@
-# (日本語) arXiv Recommender
+# arXiv Recommender
 
 BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文推薦ツールです。Google Gemini を利用しています。
 
