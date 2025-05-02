@@ -2,6 +2,7 @@
 *.npz
 .DS_Store
 *.log
+*.bib
 cache/
 output/
 my_run_*.sh
