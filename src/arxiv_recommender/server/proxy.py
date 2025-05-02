@@ -83,6 +83,8 @@ if __name__ == '__main__':
     print("API Key Check: Ensure GAI_API_KEY or GEMINI_API_KEY environment variable is set.")
     print("Listening on http://localhost:5001")
     print("Press CTRL+C to stop")
+    # Log the current process PID
+    logging.info(f"Server PID: {os.getpid()}")
     # Run Flask dev server (suitable for local use)
     # Consider using a production server like Gunicorn/Waitress for more robust deployment
     app.run(host='localhost', port=5001, debug=False) # Turn debug=False for security 

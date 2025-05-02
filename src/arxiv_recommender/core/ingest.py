@@ -172,24 +172,26 @@ def fetch_arxiv(date: str | None = None,
                     cats: list[str] = CS_CATS,
                     max_results: int = 2000):
     """
-    指定日の CS 系論文を arxiv.py で取得する（日付は GMT 基準）。
+    指定日の前日(GMT)にsubmitされたCS系論文を arxiv.py で取得する。
+    これにより、指定日当日に公開された論文を取得できる可能性を高める。
     """
-    # Handle 'today' as input for date
+    # 'today'や日付指定時は、その1日前(UTC)をクエリに使う
     if date is None or date.lower() == 'today':
-        # Use today's UTC date
-        date_obj = dt.datetime.utcnow().date()
-        logging.info(f"Fetching arXiv papers for today (UTC): {date_obj.isoformat()}")
+        target_date_obj = dt.datetime.utcnow().date()
+        logging.info(f"Targeting arXiv papers published around today (UTC): {target_date_obj.isoformat()}")
     else:
         try:
-            # Parse the provided date string
-            date_obj = dt.date.fromisoformat(date)
-            logging.info(f"Fetching arXiv papers for specified date (UTC): {date_obj.isoformat()}")
+            target_date_obj = dt.date.fromisoformat(date)
+            logging.info(f"Targeting arXiv papers published around specified date (UTC): {target_date_obj.isoformat()}")
         except ValueError:
             logging.error(f"Invalid date format: '{date}'. Please use YYYY-MM-DD or 'today'. Using today's date instead.")
-            date_obj = dt.datetime.utcnow().date() # Fallback to today
+            target_date_obj = dt.datetime.utcnow().date()
 
-    date_str = date_obj.strftime("%Y%m%d")
-    date_range = f"submittedDate:[{date_str}0000 TO {date_str}2359]"
+    # クエリには1日前の日付を使う
+    query_date_obj = target_date_obj - dt.timedelta(days=1)
+    query_date_str = query_date_obj.strftime("%Y%m%d")
+    date_range = f"submittedDate:[{query_date_str}0000 TO {query_date_str}2359]"
+    logging.info(f"Querying arXiv for papers submitted on (UTC): {query_date_obj.isoformat()} using range: {date_range}")
 
     cat_query = "(" + " OR ".join(f"cat:{c}" for c in cats) + ")"
     query = f"{cat_query} AND {date_range}"
@@ -210,7 +212,8 @@ def fetch_arxiv(date: str | None = None,
         "authors": [str(author) for author in r.authors],
         "primary_category": r.primary_category,
     } for r in client.results(search)]
-    logging.info("Fetched %d papers for %s (UTC)", len(papers), date_obj)
+    logging.info("Fetched %d papers for %s (UTC, actually submitted previous day)", len(papers), query_date_obj)
+    logging.info("Note: These papers were submitted the day before the target date '%s' (UTC). Actual publication dates might vary slightly due to arXiv processing times.", target_date_obj.isoformat())
     return papers
 
 # def fetch_arxiv(date: str | None = None) -> List[Dict[str, str]]:

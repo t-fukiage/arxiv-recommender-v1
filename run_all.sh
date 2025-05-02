@@ -40,17 +40,23 @@ python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --date today --clust
 # python src/arxiv_recommender/core/main.py --bib "$BIB_FILE" --mode gemini --date today --cluster
 echo "HTML生成完了。"
 
-echo "ステップ 4: プロキシサーバーをバックグラウンドで起動 (localhost:5001)..."
-python src/arxiv_recommender/server/proxy.py > proxy.log 2>&1 &
-proxy_pid=$!
-echo "プロキシサーバー起動完了 (PID: $proxy_pid)。ログは proxy.log を参照。"
+{
+  echo "ステップ 4: プロキシサーバーをバックグラウンドで起動 (localhost:5001)..."
+  python src/arxiv_recommender/server/proxy.py &
+  proxy_pid=$!
+  echo "プロキシサーバー起動完了 (PID: $proxy_pid)。"
+  echo "Server PID: $proxy_pid"
+} >> proxy.log 2>&1
 # サーバーが起動するまで少し待つ (任意)
 sleep 2
 
-echo "ステップ 5: HTTPサーバーをバックグラウンドで起動 (localhost:$HTTP_PORT)..."
-python -m http.server -d output $HTTP_PORT > http_server.log 2>&1 &
-http_server_pid=$!
-echo "HTTPサーバー起動完了 (PID: $http_server_pid)。ログは http_server.log を参照。"
+{
+  echo "ステップ 5: HTTPサーバーをバックグラウンドで起動 (localhost:$HTTP_PORT)..."
+  python -m http.server -d output $HTTP_PORT &
+  http_server_pid=$!
+  echo "HTTPサーバー起動完了 (PID: $http_server_pid)。"
+  echo "Server PID: $http_server_pid"
+} >> http_server.log 2>&1
 
 echo ""
 echo "--- 準備完了 ---"
