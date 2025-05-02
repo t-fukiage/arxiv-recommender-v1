@@ -27,6 +27,13 @@ BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文
     - 推薦リストと HTML 出力を生成します。
     - プロキシサーバーと HTTP サーバーをバックグラウンドで起動します。
 
+    > **実行時に `zsh: permission denied: ./run_all.sh` などのエラーが出た場合は、以下のコマンドで実行権限を付与してください：
+    > 
+    > ```bash
+    > chmod +x run_all.sh
+    > ```
+    > 
+
 4.  **結果の確認:**
     - Web ブラウザを開き、`http://localhost:8001` にアクセスします。
 
@@ -216,6 +223,12 @@ This command-line tool generates recommendations for new arXiv papers based on t
     - Activate the conda environment.
     - Generate recommendations and the HTML output.
     - Start a proxy server and an HTTP server in the background.
+
+    > If you see an error like `zsh: permission denied: ./run_all.sh` when running a shell script, add execute permission with:
+    > 
+    > ```bash
+    > chmod +x run_all.sh
+    > ```
 
 4.  **Access the results:**
     - Open your web browser and navigate to: `http://localhost:8001`
