@@ -53,28 +53,30 @@ def load_app_config():
 
 @app.route('/explain', methods=['GET'])
 def explain_paper():
-    arxiv_id = request.args.get('id')
-    if not arxiv_id:
+    paper_id = request.args.get('id')
+    source = request.args.get('source', 'arXiv') # Default to arXiv if not provided, and ensure key matches JS
+
+    if not paper_id:
         return jsonify({'error': 'Missing required parameter: id'}), 400
 
     if not cfg:
          return jsonify({'error': 'Server configuration could not be loaded.'}), 500
 
-    logging.info(f"Received request to explain arXiv ID: {arxiv_id}")
+    logging.info(f"Received request to explain ID: {paper_id} from source: {source}")
 
     try:
-        # Use the imported get_explanation function
-        explanation_text = get_explanation(arxiv_id, cfg)
+        # Pass source to get_explanation function
+        explanation_text = get_explanation(paper_id, source, cfg)
 
         if explanation_text:
-            logging.info(f"Successfully generated explanation for {arxiv_id}")
+            logging.info(f"Successfully generated explanation for {paper_id} ({source})")
             return jsonify({'explanation': explanation_text})
         else:
-            logging.warning(f"Failed to generate explanation for {arxiv_id} (returned None)")
-            return jsonify({'error': f'Failed to generate explanation for {arxiv_id}. Check proxy server logs.'}), 500
+            logging.warning(f"Failed to generate explanation for {paper_id} ({source}) (returned None)")
+            return jsonify({'error': f'Failed to generate explanation for {paper_id} ({source}). Check proxy server logs.'}), 500
 
     except Exception as e:
-        logging.error(f"Exception during explanation generation for {arxiv_id}: {e}", exc_info=True)
+        logging.error(f"Exception during explanation generation for {paper_id} ({source}): {e}", exc_info=True)
         return jsonify({'error': 'An internal server error occurred.'}), 500
 
 if __name__ == '__main__':

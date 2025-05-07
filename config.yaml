@@ -65,14 +65,52 @@ explanation:
 
 # --- Fetch settings ---
 fetch:
-  # Limit arXiv fetching to specific categories (empty list = all CS default in ingest.py)
-  arxiv_categories:
-    - cs.AI
-    - cs.LG
-    - cs.CV
-    - cs.CL
-    - cs.GR
-    - cs.HC
-    - stat.ML
-    - q-bio.NC
-    - q-bio.QM
+  arxiv:
+    categories:
+      - "cs.AI"
+      - "cs.LG"
+      - "cs.CV"
+      - "cs.CL"
+      - "cs.GR"
+      - "cs.HC"
+      - "stat.ML"
+      - "q-bio.NC"
+      - "q-bio.QM"
+    max_results_per_category: 300 # Maximum results to fetch for all arXiv categories (note: arxiv API's max_results is global not per category)
+    days_back: 1 # Number of days back to fetch papers from
+
+  biorxiv:
+    categories:
+      - "neuroscience"
+      - "bioinformatics"
+      # - "genomics"
+      - "evolutionary biology"
+      # - "microbiology"
+      - "synthetic biology"
+      - "systems biology"
+      - "animal behavior and cognition"
+      # - "biochemistry"
+      # - "bioengineering"
+      # - "biophysics"
+      # - "cancer biology"
+      # - "cell biology"
+      # - "clinical trials"
+      # - "developmental biology"
+      # - "ecology"
+      # - "epidemiology"
+      # - "genetics"
+      # - "immunology"
+      # - "medical informatics"
+      # - "molecular biology"
+      # - "paleontology"
+      # - "pathology"
+      # - "pharmacology and toxicology"
+      # - "physiology"
+      # - "plant biology"
+      # - "scientific communication and education"
+      # - "zoology"
+    max_results_per_category: 100 # Maximum results to fetch per category
+    days_back: 1 # Number of days back to fetch papers from (e.g., 1 means yesterday)
+
+# Local BibTeX file settings
+# ... existing code ...

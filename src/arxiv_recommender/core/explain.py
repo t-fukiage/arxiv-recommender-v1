@@ -39,7 +39,44 @@ def fetch_and_extract_fulltext(arxiv_id: str, pdf_url: str, cache_dir: Path) -> 
     # Download PDF if not cached
     try:
         if not pdf_path.exists():
-            resp = requests.get(pdf_url)
+            base_session_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+            }
+            
+            session = requests.Session()
+            session.headers.update(base_session_headers)
+            resp = None # Initialize resp
+
+            if "biorxiv.org/content" in pdf_url:
+                html_url = pdf_url.replace(".full.pdf", ".full-text")
+                
+                html_headers = {
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                    "Referer": "https://www.biorxiv.org/" 
+                }
+                try:
+                    logger.debug(f"Preloading HTML for {arxiv_id}: {html_url}")
+                    session.get(html_url, headers=html_headers, timeout=15)
+                except Exception as e:
+                    logger.warning(f"Error preloading HTML page {html_url} for {arxiv_id}: {e}")
+
+                pdf_headers = {
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8,application/pdf;q=0.9",
+                    "Referer": html_url 
+                }
+                logger.debug(f"Fetching PDF for {arxiv_id}: {pdf_url}")
+                resp = session.get(pdf_url, headers=pdf_headers, timeout=30)
+            
+            else: 
+                non_biorxiv_headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Accept": "application/pdf,*/*;q=0.8",
+                }
+                logger.debug(f"Fetching non-bioRxiv PDF for {arxiv_id}: {pdf_url}")
+                resp = requests.get(pdf_url, headers=non_biorxiv_headers, timeout=30)
+            
             resp.raise_for_status()
             pdf_path.write_bytes(resp.content)
     except Exception as e:
@@ -58,7 +95,44 @@ def fetch_and_extract_fulltext(arxiv_id: str, pdf_url: str, cache_dir: Path) -> 
 # Helper to download PDF bytes for direct PDF-based generation
 def fetch_pdf_bytes(pdf_url: str) -> bytes | None:
     try:
-        resp = requests.get(pdf_url)
+        base_session_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+        }
+        
+        session = requests.Session()
+        session.headers.update(base_session_headers)
+        resp = None # Initialize resp
+
+        if "biorxiv.org/content" in pdf_url:
+            html_url = pdf_url.replace(".full.pdf", ".full-text")
+            
+            html_headers = {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Referer": "https://www.biorxiv.org/" 
+            }
+            try:
+                logger.debug(f"Preloading HTML for PDF URL: {html_url}")
+                session.get(html_url, headers=html_headers, timeout=15)
+            except Exception as e:
+                logger.warning(f"Error preloading HTML page {html_url} for PDF URL {pdf_url}: {e}")
+
+            pdf_headers = {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8,application/pdf;q=0.9",
+                "Referer": html_url 
+            }
+            logger.debug(f"Fetching PDF: {pdf_url}")
+            resp = session.get(pdf_url, headers=pdf_headers, timeout=30)
+        
+        else: 
+            non_biorxiv_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "application/pdf,*/*;q=0.8",
+            }
+            logger.debug(f"Fetching non-bioRxiv PDF: {pdf_url}")
+            resp = requests.get(pdf_url, headers=non_biorxiv_headers, timeout=30)
+        
         resp.raise_for_status()
         return resp.content
     except Exception as e:
@@ -185,9 +259,9 @@ Abstract: {{abstract}}"""
         return None
 
 # Main function to get explanation (handles caching)
-def get_explanation(arxiv_id: str, config: dict) -> str | None:
+def get_explanation(paper_id: str, source: str, config: dict) -> str | None:
     """
-    Gets the explanation for a given arXiv ID.
+    Gets the explanation for a given paper ID and source (arXiv or bioRxiv).
     Checks cache first, otherwise fetches paper details, generates explanation, and caches it.
     """
     explanation_config = config.get('explanation', {})
@@ -200,12 +274,12 @@ def get_explanation(arxiv_id: str, config: dict) -> str | None:
     cache_dir = main_cache_dir / explanation_cache_subdir
     ensure_dir(cache_dir)
 
-    # Create a unique cache key based on ID, model, and language
+    # Create a unique cache key based on ID, source, model, and language
     model_name = explanation_config.get('model_name', 'gemini-1.5-flash-latest')
     target_language = explanation_config.get('target_language', 'English')
-    # Use a hash of the relevant config parts to avoid super long filenames
     config_hash = hashlib.md5(f"{model_name}-{target_language}".encode()).hexdigest()[:8]
-    cache_filename = f"{arxiv_id.replace('/', '_')}_{config_hash}.txt" # Sanitize ID for filename
+    # Include source in cache filename to differentiate between arXiv ID and DOI if they could be identical
+    cache_filename = f"{source}_{paper_id.replace('/', '_')}_{config_hash}.txt"
     cache_file = cache_dir / cache_filename
 
     # 1. Check cache
@@ -220,31 +294,75 @@ def get_explanation(arxiv_id: str, config: dict) -> str | None:
     logger.info(f"Cache miss for explanation: {cache_file}. Generating...")
 
     # 2. Fetch paper details (Title and Abstract)
-    try:
-        search = arxiv.Search(id_list=[arxiv_id], max_results=1)
-        results = list(search.results())
-        if not results:
-            logger.error(f"Could not find paper with arXiv ID: {arxiv_id}")
-            return None
-        paper = results[0]
-        title = paper.title
-        abstract = paper.summary.replace('\n', ' ') # Clean up newlines in abstract
-        logger.debug(f"Fetched details for {arxiv_id}: '{title[:50]}...'")
+    title = None
+    abstract = None
+    pdf_url = None # Initialize pdf_url
+    paper_version = None # For bioRxiv PDF URL construction
 
-    except Exception as e:
-        logger.error(f"Error fetching paper details for {arxiv_id} from arXiv API: {e}")
+    if source.lower() == 'arxiv':
+        try:
+            search = arxiv.Search(id_list=[paper_id], max_results=1)
+            results = list(search.results())
+            if not results:
+                logger.error(f"Could not find paper with arXiv ID: {paper_id}")
+                return None
+            paper_obj = results[0]
+            title = paper_obj.title
+            abstract = paper_obj.summary.replace('\n', ' ')
+            pdf_url = getattr(paper_obj, 'pdf_url', None)
+            logger.debug(f"Fetched details for arXiv:{paper_id}: '{title[:50]}...'")
+        except Exception as e:
+            logger.error(f"Error fetching paper details for arXiv ID {paper_id} from arXiv API: {e}")
+            return None
+    elif source.lower() == 'biorxiv':
+        # Fetch details from bioRxiv API for DOI
+        # This assumes paper_id is a DOI for bioRxiv
+        try:
+            # Use the bioRxiv API to get details for a single DOI
+            # https://api.biorxiv.org/details/[server]/[DOI]/na/[format]
+            biorxiv_api_url = f"https://api.biorxiv.org/details/biorxiv/{paper_id}/na/json"
+            response = requests.get(biorxiv_api_url, timeout=15)
+            response.raise_for_status()
+            data = response.json()
+            if data and 'collection' in data and data['collection']:
+                entry = data['collection'][0]
+                title = entry.get('title')
+                abstract = entry.get('abstract', '').replace('\n', ' ')
+                paper_version = entry.get('version')
+                # Construct bioRxiv PDF URL: https://www.biorxiv.org/content/{DOI}v{version}.full.pdf
+                if paper_version:
+                    pdf_url = f"https://www.biorxiv.org/content/{paper_id}v{paper_version}.full.pdf"
+                else:
+                    # Fallback if version is not available, try without version (might get latest or fail)
+                    pdf_url = f"https://www.biorxiv.org/content/{paper_id}.full.pdf"
+                logger.debug(f"Fetched details for bioRxiv:{paper_id} (v{paper_version}): '{title[:50]}...'")
+            else:
+                logger.error(f"Could not find paper details for DOI {paper_id} on bioRxiv or API response malformed.")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching paper details for DOI {paper_id} from bioRxiv API: {e}")
+            return None
+        except ValueError as e: # JSON decoding error
+            logger.error(f"Error decoding JSON from bioRxiv API for DOI {paper_id}: {e}")
+            return None
+    else:
+        logger.error(f"Unsupported source: {source} for paper ID: {paper_id}")
+        return None
+
+    if not title or not abstract:
+        logger.error(f"Failed to get title or abstract for {source}:{paper_id}. Cannot generate explanation.")
         return None
 
     # 3. Fetch PDF bytes if Files API is enabled
     pdf_bytes = None
     if explanation_config.get('use_files_api', False):
-        pdf_url = getattr(paper, 'pdf_url', None)
         if pdf_url:
             pdf_bytes = fetch_pdf_bytes(pdf_url)
             if not pdf_bytes:
-                logger.warning("PDF download failed; cannot use Files API. Will fallback to text-based.")
+                logger.warning(f"PDF download failed from {pdf_url}; cannot use Files API. Will fallback to text-based.")
         else:
-            logger.warning(f"PDF URL not available for {arxiv_id}; cannot use Files API.")
+            logger.warning(f"PDF URL not available for {source}:{paper_id}; cannot use Files API.")
+
     # 4. Generate explanation
     api_key = os.getenv("GAI_API_KEY")
     explanation = generate_explanation_gemini(
@@ -263,7 +381,7 @@ def get_explanation(arxiv_id: str, config: dict) -> str | None:
         except Exception as e:
             logger.error(f"Error writing cache file {cache_file}: {e}")
     else:
-        logger.warning(f"Failed to generate explanation for {arxiv_id}.")
+        logger.warning(f"Failed to generate explanation for {source}:{paper_id}.")
 
     return explanation
 
@@ -277,35 +395,66 @@ if __name__ == '__main__':
         'cache_dir': 'cache',
         'explanation': {
             'enable': True,
-            'model_name': 'gemini-1.5-flash-latest',
+            'model_name': 'gemini-1.5-flash-latest', # Or 'gemini-1.5-pro-latest' for Files API testing
             'target_language': 'Japanese',
             'cache_dir': 'explanation_cache',
             'prompt_template': """以下の論文について、主要な貢献と新規性を中心に{target_language}で3-4文で簡潔に解説してください。
 
 Title: {title}
 
-Abstract: {abstract}"""
+Abstract: {abstract}""",
+            # To test Files API mode, uncomment the following and ensure a capable model is set
+            # 'use_files_api': True,
+            # 'files_api_model': 'gemini-1.5-pro-latest',
+            # 'files_api_prompt_template': "この PDF 論文を{target_language}で 300 字程度で要約してください。"
         }
     }
 
-    # Ensure API key is set as environment variable: export GEMINI_API_KEY='YOUR_KEY'
-    test_arxiv_id = '2305.15334' # Example paper ID
-    print(f"Attempting to get explanation for: {test_arxiv_id}")
-    explanation_text = get_explanation(test_arxiv_id, mock_config)
+    # Ensure API key is set as environment variable: export GAI_API_KEY='YOUR_KEY'
+    
+    # --- Test arXiv ---
+    test_arxiv_id = '2305.15334' # Example arXiv paper ID
+    print(f"Attempting to get explanation for arXiv ID: {test_arxiv_id}")
+    explanation_text_arxiv = get_explanation(test_arxiv_id, 'arxiv', mock_config)
 
-    if explanation_text:
-        print("\n--- Explanation ---")
-        print(explanation_text)
-        print("\n-------------------")
+    if explanation_text_arxiv:
+        print("\n--- Explanation (arXiv) ---")
+        print(explanation_text_arxiv)
+        print("\n---------------------------")
     else:
-        print("\nFailed to get explanation.")
+        print(f"\nFailed to get explanation for arXiv ID: {test_arxiv_id}.")
 
-    # Test cache retrieval
-    print(f"\nAttempting to get explanation for {test_arxiv_id} again (should be cached)...")
-    explanation_text_cached = get_explanation(test_arxiv_id, mock_config)
-    if explanation_text_cached:
-        print("\n--- Cached Explanation ---")
-        print(explanation_text_cached)
-        print("\n------------------------")
+    # Test arXiv cache retrieval
+    print(f"\nAttempting to get explanation for arXiv ID {test_arxiv_id} again (should be cached)...")
+    explanation_text_arxiv_cached = get_explanation(test_arxiv_id, 'arxiv', mock_config)
+    if explanation_text_arxiv_cached:
+        print("\n--- Cached Explanation (arXiv) ---")
+        print(explanation_text_arxiv_cached)
+        print("\n--------------------------------")
     else:
-         print("\nFailed to get cached explanation.") 
+         print(f"\nFailed to get cached explanation for arXiv ID: {test_arxiv_id}.")
+
+    print("\n=====================================================\n")
+
+    # --- Test bioRxiv ---
+    # Replace with a valid bioRxiv DOI that has a PDF available for Files API testing if enabled
+    test_biorxiv_doi = "10.1101/2023.10.13.562298" 
+    print(f"Attempting to get explanation for bioRxiv DOI: {test_biorxiv_doi}")
+    explanation_text_biorxiv = get_explanation(test_biorxiv_doi, 'biorxiv', mock_config)
+
+    if explanation_text_biorxiv:
+        print("\n--- Explanation (bioRxiv) ---")
+        print(explanation_text_biorxiv)
+        print("\n-----------------------------")
+    else:
+        print(f"\nFailed to get explanation for bioRxiv DOI: {test_biorxiv_doi}.")
+
+    # Test bioRxiv cache retrieval
+    print(f"\nAttempting to get explanation for bioRxiv DOI {test_biorxiv_doi} again (should be cached)...")
+    explanation_text_biorxiv_cached = get_explanation(test_biorxiv_doi, 'biorxiv', mock_config)
+    if explanation_text_biorxiv_cached:
+        print("\n--- Cached Explanation (bioRxiv) ---")
+        print(explanation_text_biorxiv_cached)
+        print("\n----------------------------------")
+    else:
+        print(f"\nFailed to get cached explanation for bioRxiv DOI: {test_biorxiv_doi}.") 

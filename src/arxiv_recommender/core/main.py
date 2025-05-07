@@ -19,7 +19,7 @@ import re  # URLを検出するための正規表現
 from sklearn.metrics.pairwise import cosine_similarity # Add this import
 
 from core.utils import load_config, setup_logger
-from core.ingest import load_bibtex, fetch_arxiv
+from core.ingest import load_bibtex, fetch_arxiv, fetch_biorxiv # Import fetch_biorxiv
 from core.embed_gemini import embed_gemini
 from core.index import ANNIndex
 from core.rerank import rerank_gemini
@@ -103,41 +103,54 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
         logging.error("No valid query texts could be generated from the BibTeX file. Aborting.")
         return
 
-    logging.info("Loading arXiv feed…")
-    # Get categories from config, fallback to empty list (-> uses default CS_CATS in fetch_arxiv)
-    fetch_cfg = cfg.get("fetch", {})
-    arxiv_categories = fetch_cfg.get("arxiv_categories", [])
-    if not isinstance(arxiv_categories, list): # Ensure it's a list
-        logging.warning(f"'fetch.arxiv_categories' in config is not a list, using defaults.")
-        arxiv_categories = [] # Use default if not a list
+    logging.info("Fetching papers based on config...")
+    all_papers = []
 
-    # Pass categories to fetch_arxiv if the list is not empty
+    # Fetch papers from arXiv
+    arxiv_cfg = cfg.get('fetch', {}).get('arxiv', {})
+    arxiv_categories = arxiv_cfg.get('categories')
     if arxiv_categories:
-         logging.info(f"Fetching arXiv papers for categories: {arxiv_categories}")
-         arxiv_papers = fetch_arxiv(date, cats=arxiv_categories)
+        logging.info(f"Fetching arXiv papers for categories: {arxiv_categories} for date: {date if date else cfg.get('fetch',{}).get('arxiv',{}).get('days_back',1)} day(s) ago")
+        arxiv_papers = fetch_arxiv(cfg, date_str=date)
+        all_papers.extend(arxiv_papers)
+        logging.info(f"Fetched {len(arxiv_papers)} papers from arXiv.")
     else:
-         # Use default categories defined in fetch_arxiv (CS_CATS)
-         logging.info(f"No categories specified in config, using default CS categories.")
-         arxiv_papers = fetch_arxiv(date)
+        logging.info("No arXiv categories specified in config (cfg.fetch.arxiv.categories), skipping arXiv fetch.")
+        arxiv_papers = [] # Ensure it's an empty list if skipped
 
-    if not arxiv_papers:
-        logging.error(f"No arXiv papers fetched for date {date}; aborting.")
+    # Fetch papers from bioRxiv
+    biorxiv_cfg = cfg.get('fetch', {}).get('biorxiv', {})
+    biorxiv_categories = biorxiv_cfg.get('categories')
+    if biorxiv_categories:
+        logging.info(f"Fetching bioRxiv papers for categories: {biorxiv_categories} for date: {date if date else cfg.get('fetch',{}).get('biorxiv',{}).get('days_back',1)} day(s) ago")
+        biorxiv_papers = fetch_biorxiv(cfg, date_str=date)
+        all_papers.extend(biorxiv_papers)
+        logging.info(f"Fetched {len(biorxiv_papers)} papers from bioRxiv.")
+    else:
+        logging.info("No bioRxiv categories specified in config (cfg.fetch.biorxiv.categories), skipping bioRxiv fetch.")
+        biorxiv_papers = [] # Ensure it's an empty list if skipped
+    
+    logging.info(f"Total papers fetched: {len(all_papers)} (arXiv: {len(arxiv_papers)}, bioRxiv: {len(biorxiv_papers)})")
+
+    if not all_papers: # Changed from arxiv_papers to all_papers
+        logging.error(f"No papers fetched from arXiv or bioRxiv for date {date}; aborting.")
         return
 
     # Create corpus texts including authors
     corpus_texts = []
     corpus_source_papers = [] # List of paper_dicts corresponding to corpus_texts/corpus_vecs
-    for p_original in arxiv_papers: # Iterate over the original arxiv_papers
+    for p_original in all_papers: # Changed from arxiv_papers to all_papers
         corpus_text = create_paper_text(p_original)
         if not corpus_text:
-             logging.warning(f"Skipping arXiv entry {p_original.get('id', 'N/A')} due to missing title, abstract, and authors.")
-             continue 
-        p_original['_corpus_index'] = len(corpus_texts) # Store index before adding to corpus_texts
+             source_name = p_original.get('source', 'Unknown') # Get source for logging
+             logging.warning(f"Skipping {source_name} entry {p_original.get('id', 'N/A')} due to missing title, abstract, and authors.")
+             continue
+        p_original['_corpus_index'] = len(corpus_texts)
         corpus_texts.append(corpus_text)
-        corpus_source_papers.append(p_original) # Add the original paper dict that has text
+        corpus_source_papers.append(p_original)
 
     if not corpus_texts:
-        logging.error("No valid corpus texts could be generated from the fetched arXiv papers. Aborting.")
+        logging.error("No valid corpus texts could be generated from the fetched papers. Aborting.")
         return
 
     # Always use Gemini provider
@@ -539,12 +552,12 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
                     # Main paper line
                     fp.write(
                         f'<li>'
-                        f'<a href="https://arxiv.org/abs/{paper["id"]}" target="_blank">{paper["title"]}</a><br>'
+                        f'<a href="{paper["url"]}" target="_blank">{paper["title"]}</a><br>'
                         f'<small><i>{authors_str}</i> [{category}]{comments_html}</small> – score {score:.3f} '
                     )
                     # Explain button (if enabled)
                     if exp_enabled:
-                        fp.write(f'<button class="explain-btn" data-id="{paper["id"]}" data-target-div="explain-{sanitized_id}">Explain</button>')
+                        fp.write(f'<button class="explain-btn" data-id="{paper["id"]}" data-source="{paper.get("source", "unknown")}" data-target-div="explain-{sanitized_id}">Explain</button>')
                     
                     # Show related papers using <details>
                     if related_papers_entries:
@@ -594,12 +607,12 @@ def run(cfg: dict, bib_path: pathlib.Path, date: str | None, topk: int, refresh_
                 # Main paper line
                 fp.write(
                     f'<li>'
-                    f'<a href="https://arxiv.org/abs/{paper["id"]}" target="_blank">{paper["title"]}</a><br>'
+                    f'<a href="{paper["url"]}" target="_blank">{paper["title"]}</a><br>'
                     f'<small><i>{authors_str}</i> [{category}]{comments_html}</small> – score {score:.3f} '
                 )
                 # Explain button (if enabled)
                 if exp_enabled:
-                    fp.write(f'<button class="explain-btn" data-id="{paper["id"]}" data-target-div="explain-{sanitized_id}">Explain</button>')
+                    fp.write(f'<button class="explain-btn" data-id="{paper["id"]}" data-source="{paper.get("source", "unknown")}" data-target-div="explain-{sanitized_id}">Explain</button>')
                 
                 # Show related papers using <details>
                 if related_papers_entries:
@@ -635,6 +648,7 @@ const proxyBaseUrl = 'http://localhost:5001'; // Assuming default proxy port
 document.querySelectorAll('.explain-btn').forEach(btn => {{
     btn.addEventListener('click', async () => {{
         const pid = btn.dataset.id;
+        const psource = btn.dataset.source; // Get source from data attribute
         const targetDivId = btn.dataset.targetDiv;
         const div = document.getElementById(targetDivId);
         const contentDiv = div.querySelector('.content');
@@ -667,7 +681,7 @@ document.querySelectorAll('.explain-btn').forEach(btn => {{
 
         try {{
             contentDiv.innerHTML = '<p>Fetching explanation from local proxy...</p>';
-            const resp = await fetch(`${{proxyBaseUrl}}/explain?id=${{pid}}`);
+            const resp = await fetch(`${{proxyBaseUrl}}/explain?id=${{pid}}&source=${{psource}}`);
 
             if (resp.ok) {{
                 const data = await resp.json();
