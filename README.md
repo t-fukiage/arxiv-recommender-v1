@@ -2,7 +2,7 @@
 
 BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文推薦ツールです。Google Gemini を利用しています。
 
-このコマンドラインツールは、手持ちの BibTeX ライブラリ内の論文アブストラクトやタイトルに基づいて、arXiv の新着論文から推薦を生成します。Google Gemini API を活用し、高品質なテキスト埋め込み、オプションでの再ランク付け、クラスタラベリングを行います。
+このコマンドラインツールは、手持ちの BibTeX ライブラリ内の論文アブストラクトやタイトルに基づいて、arXiv の新着論文から推薦を生成します。Google Gemini API を活用し、高品質なテキスト埋め込み、クラスタラベリングを行います。
 
 ## クイックスタート (日本語)
 
@@ -13,12 +13,16 @@ BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文
     ./setup_arxiv_reco_env.sh
     ```
 
-2.  **`run_all.sh` の設定:**
+2.  **BibTeXファイルの準備:**
+    - Paperpileの場合、ライブラリ内の全ての論文を選択し、BibTeX形式でエクスポートします。このとき、必ず「abstract（要旨）」も含めて出力するように設定してください。
+    - 1つのファイルにBibTeX形式で出力できるのであれば、他の文献管理ソフトでも問題ありません。
+
+3.  **`run_all.sh` の設定:**
     - `run_all.sh` ファイルを開きます。
     - `BIB_FILE` 変数をあなたの BibTeX ファイルのパスに更新します。
     - `GAI_API_KEY` 変数をあなたの実際の Google AI API キーに更新します。
 
-3.  **アプリケーションの実行:**
+4.  **アプリケーションの実行:**
     ```bash
     ./run_all.sh
     ```
@@ -34,10 +38,10 @@ BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文
     > ```
     > 
 
-4.  **結果の確認:**
+5.  **結果の確認:**
     - Web ブラウザを開き、`http://localhost:8001` にアクセスします。
 
-サーバーを停止するには、`run_all.sh` 完了時にターミナルに表示される `kill` コマンドを使用してください。
+サーバーを停止するには、スクリプト実行中のターミナルでEnterキーを押してください。
 
 ## 主な機能
 
@@ -199,7 +203,7 @@ MIT ライセンス
 
 Personalized arXiv recommendation tool based on your BibTeX library, powered by Google Gemini.
 
-This command-line tool generates recommendations for new arXiv papers based on the abstracts and titles in your existing BibTeX library. It leverages the Google Gemini API for high-quality text embeddings and optional re-ranking and cluster labeling.
+This command-line tool generates recommendations for new arXiv papers based on the abstracts and titles in your existing BibTeX library. It leverages the Google Gemini API for high-quality text embeddings and optional cluster labeling.
 
 ## Quick Start
 
@@ -210,30 +214,34 @@ This command-line tool generates recommendations for new arXiv papers based on t
     ./setup_arxiv_reco_env.sh
     ```
 
-2.  **Configure `run_all.sh`:**
+2.  **Prepare BibTeX file:**
+    - For Paperpile, select all papers in the library and export as BibTeX. Make sure to include abstracts when exporting.
+    - Any reference manager that can export a single BibTeX file with abstracts is acceptable if it can output a single BibTeX file with abstracts.
+
+3.  **Configure `run_all.sh`:**
     - Open the `run_all.sh` file.
     - Update the `BIB_FILE` variable with the path to your BibTeX file.
     - Update the `GAI_API_KEY` variable with your actual Google AI API key.
 
-3.  **Run the application:**
+4.  **Run the application:**
     ```bash
-    ./run_all.sh
+    ./run_all_en.sh
     ```
     This script will:
     - Activate the conda environment.
     - Generate recommendations and the HTML output.
     - Start a proxy server and an HTTP server in the background.
 
-    > If you see an error like `zsh: permission denied: ./run_all.sh` when running a shell script, add execute permission with:
+    > If you see an error like `zsh: permission denied: ./run_all_en.sh` when running a shell script, add execute permission with:
     > 
     > ```bash
-    > chmod +x run_all.sh
+    > chmod +x run_all_en.sh
     > ```
 
-4.  **Access the results:**
+5.  **Access the results:**
     - Open your web browser and navigate to: `http://localhost:8001`
 
-To stop the servers, use the `kill` commands displayed in the terminal when `run_all.sh` finishes.
+To stop the servers, press Enter in the terminal where the script is running.
 
 ## Features
 

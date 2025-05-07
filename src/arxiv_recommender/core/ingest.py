@@ -211,6 +211,7 @@ def fetch_arxiv(date: str | None = None,
         "url": r.pdf_url,
         "authors": [str(author) for author in r.authors],
         "primary_category": r.primary_category,
+        "comments": r.comment if hasattr(r, 'comment') and r.comment else None,  # コメントを追加
     } for r in client.results(search)]
     logging.info("Fetched %d papers for %s (UTC, actually submitted previous day)", len(papers), query_date_obj)
     logging.info("Note: These papers were submitted the day before the target date '%s' (UTC). Actual publication dates might vary slightly due to arXiv processing times.", target_date_obj.isoformat())

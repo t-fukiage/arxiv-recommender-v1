@@ -30,22 +30,28 @@ output:
 explanation:
   enable: true              # Enable the explanation feature in HTML output
   model_name: gemini-2.0-flash-lite # LLM for generating explanations (Fallback if Files API fails)
-  target_language: Japanese # Target language for explanations (e.g., "English", "Japanese")
+  target_language: English # Target language for explanations (e.g., "English", "Japanese")
   cache_dir: explanation_cache # Subdirectory within the main cache_dir for explanations
   precompute: false         # Generate explanations during the main run (requires API calls)
   use_files_api: true       # NEW: Use Files API for PDF processing (preferred)
   files_api_model: gemini-2.0-flash-lite # Model for Files API (can handle large context)
   files_api_prompt_template: |
-    この PDF 論文を{target_language}で 400 字程度で要約してください。
+    この PDF 論文を{target_language}で 要約してください。
     以下のセクションを含めてください:
-    *   この研究がどのような問題を解決したのか (120字程度)
-    *   手法概要 (120字程度)
-    *   主要な結果 (可能なら数値を含む)
-    *   限界と今後の課題
-    *   新規性・貢献 (箇条書き5点以内)
-    *   重要性 (2文程度)
-    *   キーワード (英語で５つ程度)
-    マークダウン形式で記述してください。
+    あなたは研究論文要約のプロフェッショナルです。以下のスタイルを厳守し、内容をわかりやすく簡潔に紹介する文章を生成してください。
+
+    1段落目：課題提起と問題点を示しつつ、提案手法名（もしあれば）を明示する。  
+    2段落目以降：提案手法の核心となるアルゴリズムや仕組みを具体的に解説する。数式の使用はできるだけ避け、言葉でわかりやすく説明する。
+    最終段落：手法の価値や今後の課題を専門的な見地から深い洞察に基づいて考察して述べる。  
+    全文で500〜1000字程度で、3〜4段落程度にまとめる。
+    マークダウン形式で記述してください。タイトルは含めないでください。
+
+  files_api_generation_config:
+    temperature: 0.25
+    top_p: 0.9
+    max_output_tokens: 1024
+  # Simple prompt template (can be customized) - Fallback if Files API fails or disabled
+
   files_api_generation_config:
     temperature: 0.25
     top_p: 0.9
@@ -55,6 +61,7 @@ explanation:
     以下の論文について、主要な貢献と新規性を中心に{target_language}で簡潔に解説してください。
     Title: {title}
     Abstract: {abstract}
+    
 
 # --- Fetch settings ---
 fetch:
