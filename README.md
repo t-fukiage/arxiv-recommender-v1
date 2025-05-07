@@ -1,8 +1,8 @@
 # arXiv Recommender
 
-BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文推薦ツールです。Google Gemini を利用しています。
+BibTeX ライブラリに基づいてパーソナライズされた arXiv & bioRxiv 論文推薦ツールです。Google Gemini を利用しています。
 
-このコマンドラインツールは、手持ちの BibTeX ライブラリ内の論文アブストラクトやタイトルに基づいて、arXiv の新着論文から推薦を生成します。Google Gemini API を活用し、高品質なテキスト埋め込み、クラスタラベリングを行います。
+このコマンドラインツールは、手持ちの BibTeX ライブラリ内の論文アブストラクトやタイトルに基づいて、arXivおよびbioRxivの新着論文から推薦を生成します。Google Gemini API を活用し、高品質なテキスト埋め込み、クラスタラベリングを行います。
 
 ## クイックスタート (日本語)
 
@@ -53,7 +53,7 @@ BibTeX ライブラリに基づいてパーソナライズされた arXiv 論文
 -   オプションで、推薦された論文の要約（Explanation）を Gemini を使って生成し、HTML 出力上でインタラクティブに表示します。
 -   BibTeX 埋め込みとクラスタ結果をキャッシュし、次回以降の実行を高速化します。
 -   推薦結果を JSON とユーザーフレンドリーな HTML 形式の両方で出力します。
--   arXiv 論文をカテゴリでフィルタリングできます。
+-   arXiv および bioRxiv から論文を取得し、カテゴリでフィルタリングできます。
 
 ## 手動セットアップ
 
@@ -188,6 +188,7 @@ python src/arxiv_recommender/server/proxy.py
 -   プロキシサーバーは、メインの推薦スクリプトと同じ `config.yaml` と API キー環境変数 (`GAI_API_KEY`) を参照します。
 -   要約は生成後にブラウザの `localStorage` にキャッシュされるため、同じ論文のExplainボタンを再度クリックしてもAPIコールは発生しません（ブラウザのキャッシュが有効な限り）。
 -   `config.yaml` の `explanation` セクションで、要約に使用するモデルやプロンプト、キャッシュ設定などを調整できます。
+-   **(既知の問題)** 現状、bioRxivから取得した論文については、PDFの取得が不安定なため、PDFに基づく説明文生成（`explanation.use_files_api: true` の場合）が期待通りに機能しないことがあります。その場合、アブストラクトベースの要約にフォールバックします。
 
 ## 技術詳細
 
@@ -248,12 +249,12 @@ To stop the servers, press Enter in the terminal where the script is running.
 -   Generates recommendations using Google Gemini embeddings (`text-embedding-004` or similar).
 -   Optionally re-ranks initial candidates using a Gemini generative model for improved relevance. (**Note:** This feature is experimental and currently recommended to be kept disabled (`rerank.enable: false` in `config.yaml`).)
 -   Optionally clusters your BibTeX library using HDBSCAN to provide topic-specific recommendations.
--   When clustering, optionally generates human-readable labels for clusters using a Gemini generative model.
-    -   If there are many clusters, you may temporarily exceed the free tier Gemini API rate limit (RPM), causing some clusters to be labeled as `nan`. However, if you rerun the script, the remaining clusters will be automatically labeled, so there is no need to worry.
--   Optionally generates summaries (explanations) for recommended papers using Gemini and displays them interactively in the HTML output.
--   Caches BibTeX embeddings and cluster results for faster subsequent runs.
+-   Generates human-readable labels for clusters using a Gemini generative model when clustering is enabled.
+    -   If the number of clusters is large, the free tier Gemini API rate limit (RPM) may be temporarily exceeded, resulting in some clusters not being labeled (`nan`). Re-running the script will automatically label the remaining clusters, so there is no need to worry.
+-   Optionally generates summaries (Explanations) for recommended papers using Gemini, displayed interactively on the HTML output.
+-   Caches BibTeX embeddings and cluster results to speed up subsequent runs.
 -   Outputs recommendations in both JSON and user-friendly HTML formats.
--   Allows filtering arXiv papers by category.
+-   Allows filtering of arXiv and bioRxiv papers by category.
 
 ## Manual Setup
 
@@ -369,25 +370,26 @@ The `score` represents relevance (higher is better), either from the re-ranker o
 
 ## Explanation Feature
 
-If you set `explanation.enable: true` in `config.yaml`, an "Explain" button will appear for each paper in the HTML output.
+If `explanation.enable: true` is set in `config.yaml`, an "Explain" button will appear for each paper in the HTML output.
 
-Clicking this button generates and displays a summary of the paper. This requires a Gemini API key as it uses the API for generation.
+Clicking this button generates and displays a summary of the paper. This uses the Gemini API, so an API key is required.
 
 **Running the Proxy Server:**
 
-Summary generation happens via a local proxy server (`src/arxiv_recommender/server/proxy.py`) running in the background. Before opening the HTML file, start the proxy server in a separate terminal:
+Summary generation is handled via a local proxy server (`src/arxiv_recommender/server/proxy.py`) running in the background. Before opening the HTML file, start the proxy server in a separate terminal:
 
 ```bash
 python src/arxiv_recommender/server/proxy.py
 ```
 
-The server listens on `http://localhost:5001` by default.
+The server listens for requests on `http://localhost:5001` by default.
 
 **Notes:**
 
--   The proxy server uses the same `config.yaml` and `GAI_API_KEY` environment variable as the main recommendation script.
--   Summaries are cached in the browser's `localStorage` after generation. Clicking the Explain button again for the same paper will not trigger another API call (as long as the browser cache is valid).
--   You can configure the explanation model, prompt, caching behavior, etc., in the `explanation` section of `config.yaml`.
+-   The proxy server references the same `config.yaml` and API key environment variable (`GAI_API_KEY`) as the main recommendation script.
+-   Summaries are cached in the browser's `localStorage` after generation, so clicking the Explain button again for the same paper will not trigger an API call (as long as the browser cache is valid).
+-   You can adjust settings for the summary model, prompts, and caching in the `explanation` section of `config.yaml`.
+-   **(Known Issue)** Currently, for papers fetched from bioRxiv, PDF-based summary generation (when `explanation.use_files_api: true`) may not function as expected due to instability in PDF retrieval. In such cases, the system will fall back to abstract-based summarization.
 
 ## Technical Details
 
