@@ -29,12 +29,12 @@ output:
 # --- Paper Explanation Settings ---
 explanation:
   enable: true              # Enable the explanation feature in HTML output
-  model_name: gemini-2.0-flash-lite # LLM for generating explanations (Fallback if Files API fails)
+  model_name: gemini-2.5-pro-exp-03-25 #gemini-2.0-flash-lite # LLM for generating explanations (Fallback if Files API fails)
   target_language: English # Target language for explanations (e.g., "English", "Japanese")
   cache_dir: explanation_cache # Subdirectory within the main cache_dir for explanations
   precompute: false         # Generate explanations during the main run (requires API calls)
   use_files_api: true       # NEW: Use Files API for PDF processing (preferred)
-  files_api_model: gemini-2.0-flash-lite # Model for Files API (can handle large context)
+  files_api_model: gemini-2.5-pro-exp-03-25 # gemini-2.0-flash-lite # Model for Files API (can handle large context)
   files_api_prompt_template: |
     この PDF 論文を{target_language}で 要約してください。
     以下のセクションを含めてください:
@@ -47,15 +47,11 @@ explanation:
     マークダウン形式で記述してください。タイトルは含めないでください。
 
   files_api_generation_config:
-    temperature: 0.25
-    top_p: 0.9
-    max_output_tokens: 1024
+    temperature: 1
+    top_p: 0.95
+    max_output_tokens: 65536
   # Simple prompt template (can be customized) - Fallback if Files API fails or disabled
 
-  files_api_generation_config:
-    temperature: 0.25
-    top_p: 0.9
-    max_output_tokens: 1024
   # Simple prompt template (can be customized) - Fallback if Files API fails or disabled
   prompt_template: |
     以下の論文について、主要な貢献と新規性を中心に{target_language}で簡潔に解説してください。

@@ -184,16 +184,35 @@ def generate_explanation_gemini(
                 top_p=gen_cfg.get('top_p', 0.9),
                 max_output_tokens=gen_cfg.get('max_output_tokens', 1024)
             )
-            # Call generate_content with prompt and uploaded file
-            logger.debug("Calling generate_content with Files API prompt and file URI...")
+            # Call generate_content with the *file first* followed by the user prompt.
+            # Newer Gemini models (e.g. 2.5-pro-exp) appear to require this order.
+            logger.debug("Calling generate_content with Files API prompt and file URI (file first)...")
             model = genai.GenerativeModel(model_name=files_api_model)
             response = model.generate_content(
-                contents=[user_prompt, uploaded_file], # Order per snippet
+                contents=[uploaded_file, user_prompt],
                 generation_config=generation_config
             )
-            # Return explanation text
-            explanation = getattr(response, 'text', '').strip()
-            logger.info(f"Successfully generated explanation via Files API (length: {len(explanation)})")
+
+            # -------- Parse response more robustly --------
+            explanation: str = ""
+            try:
+                # Preferred convenience property (may be empty for some models)
+                if getattr(response, "text", "").strip():
+                    explanation = response.text.strip()
+                # Fallback: inspect first candidate part
+                elif getattr(response, "candidates", None):
+                    first_cand = response.candidates[0] if response.candidates else None
+                    if first_cand and first_cand.content.parts:
+                        explanation = first_cand.content.parts[0].text.strip()
+            except Exception as parse_e:
+                logger.debug(f"Error while parsing Files API response: {parse_e}")
+
+            # ------------------------------------------------
+
+            if explanation:
+                logger.info(f"Successfully generated explanation via Files API (length: {len(explanation)})")
+            else:
+                logger.warning("Files API response contained no usable text; will fall back to abstract-based generation.")
             if uploaded_file:
                 try:
                     logger.debug(f"Deleting uploaded file: {uploaded_file.name}")
@@ -201,7 +220,8 @@ def generate_explanation_gemini(
                     logger.info(f"Successfully deleted uploaded file: {uploaded_file.name}")
                 except Exception as e:
                     logger.error(f"Error deleting uploaded file {uploaded_file.name}: {e}")
-            return explanation
+            if explanation:
+                return explanation
         except Exception as e:
             logger.error(f"Error during Files API explanation generation: {e}")
             return None # Fallback to text-based method below
